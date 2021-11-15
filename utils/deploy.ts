@@ -3,6 +3,7 @@ import { delay, fromMin, fromSec } from ".";
 import editJsonFile from "edit-json-file";
 import { ContractFactory } from "@ethersproject/contracts";
 import { SignerWithAddress } from "hardhat-deploy-ethers/dist/src/signers";
+import { VoidSigner } from "ethers";
 const hre = require("hardhat");
 
 type DeployParam<T extends ContractFactory> = Parameters<InstanceType<{ new (): T }>["deploy"]>;
@@ -15,8 +16,9 @@ interface ContractLog {
 }
 
 export class MacroChain {
-  public owner: SignerWithAddress;
-  public users: SignerWithAddress[];
+  readonly owner: SignerWithAddress;
+  readonly users: SignerWithAddress[];
+  readonly zero: VoidSigner;
 
   constructor(signer: SignerWithAddress | SignerWithAddress[]) {
     if (Array.isArray(signer)) {
@@ -25,6 +27,7 @@ export class MacroChain {
       this.users[0] = signer;
     }
     this.owner = this.users[0];
+    this.zero = new ethers.VoidSigner(ethers.constants.AddressZero, ethers.provider);
   }
 
   static init = async (): Promise<MacroChain> => {
