@@ -34,5 +34,7 @@ export const fromBNArray = (valuesBN: BigNumber[]): number[] => {
   return values;
 };
 
+export const tenPow18 = toBN(10).pow(18);
+
 export const fromSec = (sec: number): number => sec * 1000;
 export const fromMin = (min: number): number => min * 60000;
