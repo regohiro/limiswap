@@ -23,9 +23,9 @@ const chainIds = {
   hardhat: 31337,
 };
 
-const MNEMONIC_LOCALHOST = process.env.MNEMONIC_LOCALHOST || "";
-const MNEMONIC_TESTNET = process.env.MNEMONIC_TESTNET || "";
-const MORALIS_API_KEY = process.env.MORALIS_API_KEY || "";
+const MNEMONIC = process.env.MNEMONIC || "";
+const ALCHEMY_API_KEY = process.env.ALCHEMY_API_KEY || "";
+const INFURA_API_KEY = process.env.INFURA_API_KEY || "";
 const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY || "";
 
 task("accounts", "Prints the list of accounts", async (taskArgs, hre) => {
@@ -36,28 +36,12 @@ task("accounts", "Prints the list of accounts", async (taskArgs, hre) => {
   }
 });
 
-function createNetworkConfig(network: keyof typeof chainIds): NetworkUserConfig {
-  const mnemonic = MNEMONIC_TESTNET;
-  const url = "https://speedy-nodes-nyc.moralis.io/eth/" + MORALIS_API_KEY;
-
-  return {
-    accounts: {
-      count: 10,
-      initialIndex: 0,
-      mnemonic,
-      path: "m/44'/60'/0'/0",
-    },
-    chainId: chainIds[network],
-    url,
-  };
-}
-
 const config: HardhatUserConfig = {
   defaultNetwork: "hardhat",
   solidity: {
     compilers: [
       {
-        version: "0.8.4",
+        version: "0.8.7",
         settings: {
           optimizer: {
             enabled: true,
@@ -70,20 +54,28 @@ const config: HardhatUserConfig = {
   networks: {
     hardhat: {
       accounts: {
-        mnemonic: MNEMONIC_LOCALHOST,
+        mnemonic: MNEMONIC,
       },
       chainId: chainIds.hardhat,
       forking: {
-        url: "https://speedy-nodes-nyc.moralis.io/" + MORALIS_API_KEY + "/eth/mainnet"
+        url: "https://eth-kovan.alchemyapi.io/v2/" + ALCHEMY_API_KEY,
+        blockNumber: 28394724,
       },
-      // mining: {
-      //   auto: true,
-      //   interval: 1000
-      // }
     },
-    mainnet: createNetworkConfig("mainnet"),
-    rinkeby: createNetworkConfig("rinkeby"),
-    mumbai: createNetworkConfig("kovan"),
+    kovan: {
+      accounts: {
+        mnemonic: MNEMONIC
+      },
+      chainId: 42,
+      url: "https://eth-kovan.alchemyapi.io/v2/" + ALCHEMY_API_KEY,
+    },
+    rinkeby: {
+      accounts: {
+        mnemonic: MNEMONIC
+      },
+      chainId: 4,
+      url: "https://rinkeby.infura.io/v3/" + INFURA_API_KEY,
+    }
   },
   etherscan: {
     apiKey: ETHERSCAN_API_KEY
