@@ -7,3 +7,4 @@ secrets
 typechain
 yarn-error.log
 **/*.DS_Store
+abis/types
