@@ -2,37 +2,37 @@ import { ethers } from "hardhat";
 import chai from "chai";
 import { solidity } from "ethereum-waffle";
 import { SignerWithAddress } from "hardhat-deploy-ethers/dist/src/signers";
-import { fromBNArray, fromWei, MacroChain, tenPow18, toBN, toBNArray, toWei } from "../utils";
+import { MacroChain, sqrt, tenPow18, tenPow9, toBN, toBNArray, toWei } from "../utils";
 import {
   IERC20,
-  IERC20__factory,
   ISwapRouter,
   ISwapRouter__factory,
   LimiSwap,
   LimiSwap__factory,
   IQuoter__factory,
   IQuoter,
+  MockERC20__factory,
 } from "../typechain";
 import { ExactInputSingleParamsStruct } from "../typechain/ISwapRouter";
-import { IUniswapV3Pool, IUniswapV3Pool__factory } from "../abis/types";
-import { Token } from "@uniswap/sdk-core";
-import { getPoolImmutables, getPrice } from "./utils";
+import {
+  INonfungiblePositionManager,
+  INonfungiblePositionManager__factory,
+} from "../abis/types";
+import { getPrice } from "./utils";
+import { MintParamsStruct } from "../abis/types/INonfungiblePositionManager";
 
 chai.use(solidity);
 const { expect } = chai;
 
 let macrochain: MacroChain;
 
-let poolAB: IUniswapV3Pool;
-let limiswap: LimiSwap;
 let swapRouter: ISwapRouter;
 let quoter: IQuoter;
+let positionManager: INonfungiblePositionManager;
 
+let limiswap: LimiSwap;
 let tokenA: IERC20;
 let tokenB: IERC20;
-
-let TokenA: Token;
-let TokenB: Token;
 
 let feeAB: number;
 
@@ -51,53 +51,99 @@ describe("LimiSwap contract test", () => {
   });
 
   before(async () => {
+    //Connect to Router & Quoter
+    const routerAddr = "0xE592427A0AEce92De3Edee1F18E0157C05861564";
+    const quoterAddr = "0xb27308f9F90D607463bb33eA1BeBb41C27CE5AB6";
+    const nonfungiblePositionManagerAddr = "0xC36442b4a4522E871399CD717aBDD847Ab11FE88";
+    swapRouter = ISwapRouter__factory.connect(routerAddr, owner);
+    quoter = IQuoter__factory.connect(quoterAddr, owner);
+    positionManager = INonfungiblePositionManager__factory.connect(nonfungiblePositionManagerAddr, owner);
+  });
+
+  before(async () => {
     const { deployer } = macrochain;
 
     //Deploy LimiSwap
-    const routerAddr = "0xE592427A0AEce92De3Edee1F18E0157C05861564";
-    const quoterAddr = "0xb27308f9F90D607463bb33eA1BeBb41C27CE5AB6";
-    limiswap = await deployer<LimiSwap__factory>("LimiSwap", [keeper.address, routerAddr, quoterAddr]);
+    limiswap = await deployer<LimiSwap__factory>("LimiSwap", [keeper.address, swapRouter.address, quoter.address]);
 
-    //Connect to Router & Quoter
-    swapRouter = ISwapRouter__factory.connect(routerAddr, owner);
-    quoter = IQuoter__factory.connect(quoterAddr, owner);
+    console.log("S1");
 
-    //Connect to TokenA-TokenB pool contract
-    const poolAddr = "0xC966A59D1087D1d1B4C15FAb5F5ddfAB31b47bF9";
-    poolAB = IUniswapV3Pool__factory.connect(poolAddr, owner);
+    //Deploy tokens
+    const supply = toWei(1_000_000);
+    tokenA = await deployer<MockERC20__factory>("MockERC20", ["a", "A", supply]);
+    tokenB = await deployer<MockERC20__factory>("MockERC20", ["b", "B", supply]);
 
-    //Get constants
-    const { token0, token1, fee } = await getPoolImmutables(poolAB);
-    TokenA = new Token(42, token1, 18);
-    TokenB = new Token(42, token0, 18);
-    feeAB = fee;
+    console.log("S2");
 
-    //Connect to token contracts
-    tokenA = IERC20__factory.connect(TokenA.address, owner);
-    tokenB = IERC20__factory.connect(TokenB.address, owner);
+    {
+      await tokenA.approve(swapRouter.address, ethers.constants.MaxUint256);
+      await tokenA.approve(positionManager.address, ethers.constants.MaxUint256);
+      await tokenB.approve(swapRouter.address, ethers.constants.MaxUint256);
+      await tokenB.approve(positionManager.address, ethers.constants.MaxUint256);
+    }
 
-    await tokenA.approve(swapRouter.address, ethers.constants.MaxUint256);
-    await tokenB.approve(swapRouter.address, ethers.constants.MaxUint256);
+    console.log("S3");
+
+    {
+      feeAB = 3000;
+      const price = 100;
+      const sqrtPriceX96 = sqrt(toBN(price).mul(tenPow18)).mul(toBN(2).pow(96)).div(tenPow9);
+
+      await positionManager.createAndInitializePoolIfNecessary(tokenA.address, tokenB.address, feeAB, sqrtPriceX96);
+    }
+
+    console.log("S4"); 
+
+    {
+      const deadline = await limiswap.getTime() + 10;
+      const MIN_TICK = -887272;
+      const MAX_TICK = -MIN_TICK;
+      const price = await getPrice(tokenA, tokenB, feeAB, quoter);
+      const amount0 = toWei(100);
+      const amount1 = price.mul(100);
+
+      const params: MintParamsStruct = {
+        token0: tokenA.address,
+        token1: tokenB.address,
+        fee: feeAB,
+        tickLower: MIN_TICK,
+        tickUpper: MAX_TICK,
+        amount0Desired: amount0,
+        amount1Desired: amount1,
+        amount0Min: 0,
+        amount1Min: 0,
+        recipient: owner.address,
+        deadline,
+      }
+      await positionManager.mint(params)
+    }
+
+    console.log("S5");
+
   });
 
   describe("Basic test", () => {
-    // Right now, A : B = 1 : 98.87
+    it("Transfers", async () => {
+      await tokenA.transfer(alice.address, toWei(10));
+    });
+
+    // Right now, A : B = 1 : 100
     it("Creates order", async () => {
-      const price = toWei(100);
+      //Creates A => B limit order of when A : B = 1 : 101
+      const price = toWei(101);
       const amountIn = toWei(1.2);
       const tokenIn = tokenA.address;
       const tokenOut = tokenB.address;
       const slippage = 10000;
 
-      await tokenA.approve(limiswap.address, amountIn);
-      //Creates A => B limit order of when A : B = 1 : 100
-      await limiswap.createOrder(price, amountIn, tokenIn, tokenOut, feeAB, slippage);
+      await tokenA.connect(alice).approve(limiswap.address, amountIn);
+      await limiswap.connect(alice).createOrder(price, amountIn, tokenIn, tokenOut, feeAB, slippage);
 
       await expect(limiswap.getOrder(1)).not.to.reverted;
     });
 
     it("Changes the price of A-B so that it meets the price target", async () => {
-      const amountIn = toWei(100);
+      const amountIn = toWei(200);
       const deadline = (await limiswap.getTime()) + 100;
 
       //Approve tokenB
@@ -118,7 +164,7 @@ describe("LimiSwap contract test", () => {
 
       //Check if price changed
       const priceAfter = await getPrice(tokenA, tokenB, feeAB, quoter);
-      expect(priceAfter).to.be.gte(toWei(100));
+      expect(priceAfter).to.be.gte(toWei(101));
     });
 
     it("Should return true for checkUpKeep", async () => {
@@ -134,19 +180,21 @@ describe("LimiSwap contract test", () => {
     });
 
     it("Performs upkeep", async () => {
-      const price = toWei(100);
+      const price = toWei(101);
       const amountIn = toWei(1.2);
       const [, performData] = await limiswap.connect(macrochain.zero).callStatic.checkUpkeep("0x");
-      const tokenB_balanceBefore = await tokenB.balanceOf(owner.address);
 
+      //Perform UpKeep
       await limiswap.connect(keeper).performUpkeep(performData);
 
-      const tokenB_balanceAfter = await tokenB.balanceOf(owner.address);
-
+      //The order shouldn't exist
       await expect(limiswap.getOrder(1)).to.be.revertedWith("Query for nonexistent order");
-      await expect(tokenB_balanceAfter.sub(tokenB_balanceBefore)).to.be.gte(
+      //Check if user got tokenB
+      await expect(await tokenB.balanceOf(alice.address)).to.be.gte(
         price.mul(amountIn).mul(9).div(10).div(tenPow18),
       );
     });
   });
+
+  describe("Intermidate test", async () => {});
 });
