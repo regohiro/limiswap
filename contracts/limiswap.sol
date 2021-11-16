@@ -52,10 +52,6 @@ contract LimiSwap is KeeperCompatibleInterface, KeeperBase, Ownable {
   event OrderCanceled(uint256 indexed orderId);
   event OrderFilled(uint256 indexed orderId);
 
-  /**
-   * @dev Initializes the contract by setting `keeperRegistery` and `swapRouter`
-   * @dev Creates empty order to fill the 0th spot of the orders array
-   */
   constructor(
     address keeperRegistery_,
     ISwapRouter swapRouter_,
@@ -130,7 +126,7 @@ contract LimiSwap is KeeperCompatibleInterface, KeeperBase, Ownable {
     for (uint256 i = 1; i < allOrders; i++) {
       Order memory order = orders[i];
       uint256 price = _getPrice(order.tokenIn, order.tokenOut, order.poolFee);
-      if (price > order.targetPrice) {
+      if (price >= order.targetPrice) {
         return (true, abi.encodePacked(i));
       }
     }
@@ -139,7 +135,12 @@ contract LimiSwap is KeeperCompatibleInterface, KeeperBase, Ownable {
 
   function performUpkeep(bytes calldata performData) external override onlyKeeper {
     uint256 index = abi.decode(performData, (uint256));
+    require(index != 0, "Order does not exist");
     Order memory order = orders[index];
+
+    //Checks
+    uint256 currentPrice = _getPrice(order.tokenIn, order.tokenOut, order.poolFee);
+    require(currentPrice >= order.targetPrice, "Target not reached");
 
     //Effects
     _deleteOrder(order.orderId);
@@ -209,7 +210,7 @@ contract LimiSwap is KeeperCompatibleInterface, KeeperBase, Ownable {
     uint24 poolFee,
     uint256 targetPrice,
     uint16 slippage
-  ) private returns (uint256 amountOut) {
+  ) private {
     IERC20Metadata token = IERC20Metadata(tokenIn);
 
     ISwapRouter.ExactInputSingleParams memory params = ISwapRouter.ExactInputSingleParams({
@@ -223,6 +224,6 @@ contract LimiSwap is KeeperCompatibleInterface, KeeperBase, Ownable {
       sqrtPriceLimitX96: 0
     });
 
-    amountOut = swapRouter.exactInputSingle(params);
+    swapRouter.exactInputSingle(params);
   }
 }
