@@ -11,13 +11,16 @@ import "./KeeperBase.sol";
 
 contract LimiSwap is KeeperCompatibleInterface, KeeperBase, Ownable {
   //Address of keeper registery
-  address public keeperRegistery;
+  address private keeperRegistery;
 
   //Address of Uniswap Router
-  ISwapRouter public swapRouter;
+  ISwapRouter private swapRouter;
 
   //Address of Quoter contract
-  IQuoter public quoter;
+  IQuoter private quoter;
+
+  //Address of WETH contract
+  IERC20 private weth;
 
   //OrderId counter
   uint256 private orderIdCounter;
@@ -55,11 +58,13 @@ contract LimiSwap is KeeperCompatibleInterface, KeeperBase, Ownable {
   constructor(
     address keeperRegistery_,
     ISwapRouter swapRouter_,
-    IQuoter quoter_
+    IQuoter quoter_,
+    IERC20 weth_
   ) {
     keeperRegistery = keeperRegistery_;
     swapRouter = swapRouter_;
     quoter = quoter_;
+    weth = weth_;
 
     _createOrder(0, 0, address(0), address(0), address(0), 0, 0);
   }
@@ -85,19 +90,24 @@ contract LimiSwap is KeeperCompatibleInterface, KeeperBase, Ownable {
     address tokenOut,
     uint24 poolFee,
     uint16 slippage
-  ) external {
+  ) external payable {
     //Checks
     require(slippage <= 10000, "Slippage out of bound");
+    if(tokenIn == address(weth)){
+      require(msg.value == amountIn, "Insufficient balance");
+    }
 
     //Effects
     address user = msg.sender;
     _createOrder(price, amountIn, tokenIn, tokenOut, user, poolFee, slippage);
 
     //Interactions
-    IERC20 token = IERC20(tokenIn);
-    token.transferFrom(user, address(this), amountIn);
-    if (token.allowance(address(this), address(swapRouter)) == 0) {
-      token.approve(address(swapRouter), ~uint256(0));
+    if(tokenIn != address(weth)){
+      IERC20 token = IERC20(tokenIn);
+      token.transferFrom(user, address(this), amountIn);
+      if (token.allowance(address(this), address(swapRouter)) == 0) {
+        token.approve(address(swapRouter), ~uint256(0));
+      }
     }
 
     emit OrderCreated(orderIdCounter - 1, price, amountIn, tokenIn, tokenOut, user, poolFee, slippage);
@@ -224,6 +234,10 @@ contract LimiSwap is KeeperCompatibleInterface, KeeperBase, Ownable {
       sqrtPriceLimitX96: 0
     });
 
-    swapRouter.exactInputSingle(params);
+    if(tokenIn == address(weth)){
+      swapRouter.exactInputSingle{ value: amountIn }(params);
+    }else{
+      swapRouter.exactInputSingle(params);
+    }
   }
 }
