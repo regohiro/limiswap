@@ -102,12 +102,12 @@ contract LimiSwap is KeeperCompatibleInterface, KeeperBase, Ownable {
     _createOrder(price, amountIn, tokenIn, tokenOut, user, poolFee, slippage);
 
     //Interactions
+    IERC20 token = IERC20(tokenIn);
+    if (token.allowance(address(this), address(swapRouter)) == 0) {
+      token.approve(address(swapRouter), ~uint256(0));
+    }
     if(tokenIn != address(weth)){
-      IERC20 token = IERC20(tokenIn);
       token.transferFrom(user, address(this), amountIn);
-      if (token.allowance(address(this), address(swapRouter)) == 0) {
-        token.approve(address(swapRouter), ~uint256(0));
-      }
     }
 
     emit OrderCreated(orderIdCounter - 1, price, amountIn, tokenIn, tokenOut, user, poolFee, slippage);

@@ -63,7 +63,8 @@ describe("LimiSwap contract test", () => {
     {
       const { deployer } = macrochain;
       //Deploy LimiSwap
-      limiswap = await deployer<LimiSwap__factory>("LimiSwap", [keeper.address, swapRouter.address, quoter.address]);
+      const wethAddr = "0xd0a1e359811322d97991e03f863a0c30c2cf029c";
+      limiswap = await deployer<LimiSwap__factory>("LimiSwap", [keeper.address, swapRouter.address, quoter.address, wethAddr]);
 
       //Deploy tokens
       const supply = toWei(1_000_000);
