@@ -52,7 +52,7 @@ contract LimiSwap is KeeperCompatibleInterface, KeeperBase, Ownable {
     uint24 poolFee,
     uint16 slippage
   );
-  event OrderCanceled(uint256 indexed orderId);
+  event OrderCancelled(uint256 indexed orderId);
   event OrderFilled(uint256 indexed orderId);
 
   constructor(
@@ -127,7 +127,7 @@ contract LimiSwap is KeeperCompatibleInterface, KeeperBase, Ownable {
     IERC20 token = IERC20(order.tokenIn);
     token.transfer(order.user, order.amountIn);
 
-    emit OrderCanceled(order.orderId);
+    emit OrderCancelled(order.orderId);
   }
 
   function checkUpkeep(bytes calldata checkData) external override cannotExecute returns (bool, bytes memory) {
