@@ -197,6 +197,7 @@ contract LimiSwap is KeeperCompatibleInterface, KeeperBase, Ownable {
     uint256 lastIndex = allOrders.length - 1;
     if (index != lastIndex) {
       allOrders[index] = allOrders[lastIndex];
+      orderIdIndex[orders[lastIndex].orderId] = index;
     }
     allOrders.pop();
     delete orderIdIndex[orderId];
