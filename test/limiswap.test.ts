@@ -300,5 +300,15 @@ describe("LimiSwap contract test", () => {
 
       await expect(limiswap.getOrder(58)).to.be.revertedWith("Query for nonexistent order");
     });
+
+    it("Cancels order 99", async () => {
+      await limiswap.connect(alice).cancelOrder(99);
+      await expect(limiswap.getOrder(99)).to.be.revertedWith("Query for nonexistent order");
+    })
+
+    it("Cancels order 100", async () => {
+      await limiswap.connect(alice).cancelOrder(100);
+      await expect(limiswap.getOrder(100)).to.be.revertedWith("Query for nonexistent order");
+    })
   });
 });
