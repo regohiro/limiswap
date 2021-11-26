@@ -11,16 +11,16 @@ import "./KeeperBase.sol";
 
 contract LimiSwap is KeeperCompatibleInterface, KeeperBase, Ownable {
   //Address of keeper registery
-  address private keeperRegistery;
+  address private immutable keeperRegistery;
 
   //Address of Uniswap Router
-  ISwapRouter private swapRouter;
+  ISwapRouter private immutable swapRouter;
 
   //Address of Quoter contract
-  IQuoter private quoter;
+  IQuoter private immutable quoter;
 
   //Address of WETH contract
-  IERC20 private weth;
+  IERC20 private immutable weth;
 
   //OrderId counter
   uint256 private orderIdCounter;
@@ -32,14 +32,14 @@ contract LimiSwap is KeeperCompatibleInterface, KeeperBase, Ownable {
   Order[] private orders;
 
   struct Order {
-    uint256 orderId;
-    uint256 targetPrice;
-    uint256 amountIn;
-    address tokenIn;
-    address tokenOut;
-    address user;
-    uint24 poolFee;
-    uint16 slippage;
+    uint256 orderId;     //32/32
+    uint256 targetPrice; //32/32
+    uint256 amountIn;    //32/32
+    address tokenIn;     //20/32
+    address tokenOut;    //20/32
+    address user;        //20/32
+    uint24 poolFee;      // 3/32
+    uint16 slippage;     // 2/32
   }
 
   event OrderCreated(
@@ -167,14 +167,6 @@ contract LimiSwap is KeeperCompatibleInterface, KeeperBase, Ownable {
     );
 
     emit OrderFilled(order.orderId);
-  }
-
-  function updateRouter(ISwapRouter swapRouter_) external onlyOwner {
-    swapRouter = swapRouter_;
-  }
-
-  function updateKeeper(address keeperRegistery_) external onlyOwner {
-    keeperRegistery = keeperRegistery_;
   }
 
   function _createOrder(
