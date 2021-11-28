@@ -10,7 +10,7 @@
     "build": "rm -rf artifacts cache typechain | yarn compile",
     "format": "prettier --write .",
     "script:kovan": "npx hardhat run --network kovan",
-    "script:rinkeby": "npx hardhat run --network rinkeby",
+    "script:local": "npx hardhat run --network localhost",
     "generate-types": "rimraf abis/types; typechain --target=ethers-v5 --out-dir 'abis/types' 'abis/*.json'"
   },
   "author": "",
