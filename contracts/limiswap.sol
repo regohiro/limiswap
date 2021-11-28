@@ -32,14 +32,14 @@ contract LimiSwap is KeeperCompatibleInterface, KeeperBase, Ownable {
   Order[] private orders;
 
   struct Order {
-    uint256 orderId;     //32/32
+    uint256 orderId; //32/32
     uint256 targetPrice; //32/32
-    uint256 amountIn;    //32/32
-    address tokenIn;     //20/32
-    address tokenOut;    //20/32
-    address user;        //20/32
-    uint24 poolFee;      // 3/32
-    uint16 slippage;     // 2/32
+    uint256 amountIn; //32/32
+    address tokenIn; //20/32
+    address tokenOut; //20/32
+    address user; //20/32
+    uint24 poolFee; // 3/32
+    uint16 slippage; // 2/32
   }
 
   event OrderCreated(
@@ -93,7 +93,7 @@ contract LimiSwap is KeeperCompatibleInterface, KeeperBase, Ownable {
   ) external payable {
     //Checks
     require(slippage <= 10000, "Slippage out of bound");
-    if(tokenIn == address(weth)){
+    if (tokenIn == address(weth)) {
       require(msg.value == amountIn, "Insufficient balance");
     }
 
@@ -106,7 +106,7 @@ contract LimiSwap is KeeperCompatibleInterface, KeeperBase, Ownable {
     if (token.allowance(address(this), address(swapRouter)) == 0) {
       token.approve(address(swapRouter), ~uint256(0));
     }
-    if(tokenIn != address(weth)){
+    if (tokenIn != address(weth)) {
       token.transferFrom(user, address(this), amountIn);
     }
 
@@ -124,8 +124,13 @@ contract LimiSwap is KeeperCompatibleInterface, KeeperBase, Ownable {
     _deleteOrder(orderId);
 
     //Interactions
-    IERC20 token = IERC20(order.tokenIn);
-    token.transfer(order.user, order.amountIn);
+    if(order.tokenIn == address(weth)){
+      (bool success, ) = payable(order.user).call{ value: order.amountIn }("");
+      require(success, "Transfer failed");
+    }else{
+      IERC20 token = IERC20(order.tokenIn);
+      token.transfer(order.user, order.amountIn);
+    }
 
     emit OrderCancelled(order.orderId);
   }
@@ -201,7 +206,7 @@ contract LimiSwap is KeeperCompatibleInterface, KeeperBase, Ownable {
     uint24 poolFee
   ) private returns (uint256 amountOut) {
     IERC20Metadata token = IERC20Metadata(tokenIn);
-    uint256 amountIn = 10 ** token.decimals();
+    uint256 amountIn = 10**token.decimals();
     amountOut = quoter.quoteExactInputSingle(tokenIn, tokenOut, poolFee, amountIn, 0);
   }
 
@@ -223,13 +228,13 @@ contract LimiSwap is KeeperCompatibleInterface, KeeperBase, Ownable {
       recipient: user,
       deadline: block.timestamp + 100,
       amountIn: amountIn,
-      amountOutMinimum: (amountIn * targetPrice * (10000 - slippage)) / (10000 * 10 ** token.decimals()),
+      amountOutMinimum: (amountIn * targetPrice * (10000 - slippage)) / (10000 * 10**token.decimals()),
       sqrtPriceLimitX96: 0
     });
 
-    if(tokenIn == address(weth)){
+    if (tokenIn == address(weth)) {
       swapRouter.exactInputSingle{ value: amountIn }(params);
-    }else{
+    } else {
       swapRouter.exactInputSingle(params);
     }
   }
