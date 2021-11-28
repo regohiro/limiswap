@@ -1,17 +1,28 @@
 import { ethers } from "hardhat";
-import { fromBN, MacroChain, toWei } from "../utils";
-const hre = require("hardhat");
+import { IERC20Metadata__factory, IQuoter__factory } from "../typechain";
+import { fromBN, MacroChain, toBN, toWei } from "../utils";
 
 const main = async () => {
   const { zero } = await MacroChain.init();
-  const addr = "0xb2fD655253F089b73136Ce8843337743D02E0377";
-  const abi = ["function getOutput(uint256 amountIn) external returns (uint256 amountOut)"];
+  const addr = "0xb27308f9f90d607463bb33ea1bebb41c27ce5ab6";
+  const tokenInAddr = "0xc95b247049a8cc8e7f68bb6ffd9eee3c97769118";
+  const tokenOutAddr = "0x3376d8cdcd1c6febaf41559a39a8acc91ad06a47";
 
-  const quote = new ethers.Contract(addr, abi, zero);
-  const amountIn = toWei(1);
-  const res = await quote.callStatic.getOutput(amountIn);
-  const amountOut = fromBN(res);
-  console.log(amountOut);
+  const quoter = IQuoter__factory.connect(addr, zero);
+  const tokenInMetadata = IERC20Metadata__factory.connect(tokenInAddr, zero);
+  const amoutIn = toBN(10).pow(await tokenInMetadata.decimals());
+
+  console.log(amoutIn.toString());
+
+  const amountOut = await quoter.callStatic.quoteExactInputSingle(
+    tokenInAddr,
+    tokenOutAddr,
+    3000,
+    amoutIn,
+    0,
+  );
+
+  console.log(fromBN(amountOut));
 }
 
 main()

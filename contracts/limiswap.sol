@@ -140,8 +140,8 @@ contract LimiSwap is KeeperCompatibleInterface, KeeperBase, Ownable {
 
     for (uint256 i = 1; i < allOrders; i++) {
       Order memory order = orders[i];
-      uint256 price = _getPrice(order.tokenIn, order.tokenOut, order.poolFee);
-      if (price >= order.targetPrice) {
+      (bool success, uint256 price) = _getPrice(order.tokenIn, order.tokenOut, order.poolFee);
+      if (success == true && price >= order.targetPrice) {
         return (true, abi.encodePacked(i));
       }
     }
@@ -154,8 +154,8 @@ contract LimiSwap is KeeperCompatibleInterface, KeeperBase, Ownable {
     Order memory order = orders[index];
 
     //Checks
-    uint256 currentPrice = _getPrice(order.tokenIn, order.tokenOut, order.poolFee);
-    require(currentPrice >= order.targetPrice, "Target not reached");
+    (bool success, uint256 price) = _getPrice(order.tokenIn, order.tokenOut, order.poolFee);
+    require(success == true && price >= order.targetPrice, "Target not reached");
 
     //Effects
     _deleteOrder(order.orderId);
@@ -204,10 +204,14 @@ contract LimiSwap is KeeperCompatibleInterface, KeeperBase, Ownable {
     address tokenIn,
     address tokenOut,
     uint24 poolFee
-  ) private returns (uint256 amountOut) {
+  ) private returns (bool, uint256) {
     IERC20Metadata token = IERC20Metadata(tokenIn);
     uint256 amountIn = 10**token.decimals();
-    amountOut = quoter.quoteExactInputSingle(tokenIn, tokenOut, poolFee, amountIn, 0);
+    try quoter.quoteExactInputSingle(tokenIn, tokenOut, poolFee, amountIn, 0) returns (uint256 amountOut){
+      return (true, amountOut);
+    } catch {
+      return (false, 0);
+    }
   }
 
   function _swapExactInputSingle(
